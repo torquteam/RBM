@@ -1,9 +1,10 @@
 # to compile cython code run
 python setup.py build_ext --inplace
 
+# to compile c files
 gcc -shared -o c_functions.so -fPIC c_functions.c -O3
 
-error quantification (BA (mev), Rch (fm), Fch-Fwk)
+error quantification and speed check (BA (mev), Rch (fm), Fch-Fwk)
 16,8 errors: 0.005591133002034105 0.0002425358695475932
     286.72s  1.2535s (0.7622s)  0.0257s/run (0.0152s/run) 228x
 
