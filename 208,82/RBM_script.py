@@ -6,7 +6,7 @@ from itertools import chain
 from scipy.integrate import simps
 import os
 import sys
-sys.path.append('/home/msals97/Desktop/FSU_FINITE/ReducedBasisMethods')
+sys.path.append('/home/msals97/Desktop/RBM/RBM')
 import functions as func
 
 current_directory = os.getcwd()
@@ -23,13 +23,13 @@ A = 208
 Z = 82
 
 # Specify the number of basis states and masses
-num_basis_states_f = [3,2,3,2,2,3,2,2,3,4,2,2,3,2,3,3,2,3,2,3,3,3]
-num_basis_states_g = [3,2,3,2,2,3,2,2,3,4,2,2,3,2,3,3,2,3,2,3,3,3]
+num_basis_states_f = [3,2,4,2,2,3,2,2,3,5,2,2,3,2,3,3,2,4,2,3,4,3]
+num_basis_states_g = [3,2,4,2,2,3,2,2,3,5,2,2,3,2,3,3,2,4,2,3,4,3]
 num_basis_states_c = [3,2,4,2,3,4,2,2,3,5,2,2,3,2,5,3]
 num_basis_states_d = [3,2,4,2,3,4,2,2,3,5,2,2,3,2,5,3]
-num_basis_states_s = 7
-num_basis_states_v = 7
-num_basis_states_b = 7
+num_basis_states_s = 8
+num_basis_states_v = 8
+num_basis_states_b = 8
 num_basis_states_a = 7
 mNuc_mev = 939
 mOmega = 782.5

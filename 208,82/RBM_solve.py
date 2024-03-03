@@ -3,7 +3,7 @@ import numpy as np
 import time
 import ctypes
 import sys
-sys.path.append('/home/msals97/Desktop/FSU_FINITE/ReducedBasisMethods')
+sys.path.append('/home/msals97/Desktop/RBM/RBM')
 import functions as func
 from cyth_funcs import compute_fields, compute_meson_fields, get_densities
 
@@ -30,7 +30,7 @@ def c_function_wrapper(x,params):
 def compute_jacobian_wrapper(x,params):
     jac = np.empty((len(x), len(x)), dtype=np.double)
     lib.compute_jacobian(x, jac.reshape(-1),params)
-    return jac
+    return jac.T
 
 # User Input
 ##################################################
@@ -76,11 +76,12 @@ errWkFF = 0
 t=0
 for i in range(50):
     params = param_set[i,:]
+    #params = [496.939,110.349,187.695,192.927,3.26,-0.003551,0.0235,0.043377]
     params_array = np.array(params, dtype=np.double)
-    start_time = time.time()
-    solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=compute_jacobian_wrapper, method='hybr',options={'col_deriv': 0, 'xtol': 1e-10})
-    end_time = time.time()
-    t = t + end_time-start_time
+    #start_time = time.time()
+    solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=compute_jacobian_wrapper, method='hybr',options={'col_deriv': 1, 'xtol': 1e-8})
+    #end_time = time.time()
+    #t = t + end_time-start_time
     # Reconstruct the wave functions
     f_coeff = np.array(func.pad([[solution.x[int(np.sum(num_basis_states_f[:j])) + i] for i in range(num_basis_states_f[j])] for j in range(nstates_n)]))
     g_coeff = np.array(func.pad([[solution.x[sum(num_basis_states_f) + int(np.sum(num_basis_states_g[:j])) + i] for i in range(num_basis_states_g[j])] for j in range(nstates_n)]))
@@ -122,8 +123,23 @@ for i in range(50):
     errWkFF = errWkFF + abs(actual_results[i][2] - FchFwk)
 
 end_time = time.time()
-print("RBM took:{:.4f} seconds per run".format((t)/50))
+print("RBM took:{:.4f} seconds per run".format((end_time-start_time)/50))
 errBA = errBA/50
 errRch = errRch/50
 errWkFF = errWkFF/50
 print(errBA, errRch, errWkFF)
+
+r0_fm = 1.25
+hbar_mevfm = 197.32698
+enscale_mev = hbar_mevfm**2/(2*mNuc_mev*r0_fm**2)
+
+#import matplotlib.pyplot as plt
+#rvec = np.loadtxt("208,82/High_fidelity_sol/Fn.txt")[:,0]
+#actual = np.loadtxt("16,8/16,8,Data/meson_fields/coulomb.txt")
+#wave = np.loadtxt("208,82/High_fidelity_sol/Fn.txt")[:,1:] 
+#meson = np.loadtxt("208,82/High_fidelity_sol/meson_fields.txt")/enscale_mev
+
+#plt.plot(r_vec,a_field_approx,ls='dashed')
+#plt.plot(r_vec,meson[:,5])
+#plt.plot(r_vec,meson[:,5])
+#plt.show()

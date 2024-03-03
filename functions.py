@@ -5,7 +5,7 @@ from scipy.linalg import svd
 from scipy.integrate import simps
 from scipy.optimize import root
 import sys
-sys.path.append('/home/msals97/Desktop/FSU_FINITE/ReducedBasisMethods')
+sys.path.append('/home/msals97/Desktop/RBM/RBM')
 from cyth_funcs import compute_fields, compute_meson_fields, get_densities
 
 # Define functions to be used in this script 
@@ -370,7 +370,7 @@ def initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_
         initial_guesses = initial_guesses + [1.0] + [0.0]*(num_basis_states_d[i]-1)
 
     initial_guesses = initial_guesses + [1.0] + [0.0]*(num_basis_states_s-1) + [1.0] + [0.0]*(num_basis_states_v-1) + [1.0] + [0.0]*(num_basis_states_b-1) + [1.0] + [0.0]*(num_basis_states_a-1)
-    initial_guesses = initial_guesses + [65.0]*nstates_n + [65.0]*nstates_p
+    initial_guesses = initial_guesses + [60.0]*nstates_n + [60.0]*nstates_p
 
     initial_guess_array = np.array(initial_guesses, dtype=np.double)
     return initial_guess_array
@@ -503,7 +503,7 @@ def hartree_RBM(A,Z,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,nu
     initial_guess_array = initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3])
 
     params_array = np.array(params, dtype=np.double)
-    solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=jac, method='hybr',options={'col_deriv': 0, 'xtol': 1e-10})
+    solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=jac, method='hybr',options={'col_deriv': 1, 'xtol': 1e-8})
 
     # Reconstruct the wave functions
     f_coeff = np.array(pad([[solution.x[int(np.sum(num_basis_states_f[:j])) + i] for i in range(num_basis_states_f[j])] for j in range(nstates_n)]))

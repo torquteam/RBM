@@ -3,6 +3,9 @@ import ctypes
 import functions as func
 import time
 import bulk2params as trans
+import multiprocessing
+import functools
+import operator
 
 # import c functions for all nuclei
 A=[16,40,48,68,90,100,116,132,144,208]
@@ -37,7 +40,7 @@ def jacobian_wrapper(lib):
     def wrapper(x, params):
         jac = np.empty((len(x), len(x)), dtype=np.double)
         lib.compute_jacobian(x, jac.reshape(-1), params)
-        return jac
+        return jac.T
     return wrapper
 
 # Create wrapper functions for all libraries
@@ -105,8 +108,8 @@ for i in range(10):
     state_info_n_list.append(state_info_n)
     state_info_p_list.append(state_info_p)
 
-def compute_lkl(exp_data,BA_mev_th, Rch_th, FchFwk_th,lkl):
-    lkl = lkl*np.exp(-0.5*(exp_data[0]-BA_mev_th)**2/exp_data[1]**2)
+def compute_lkl(exp_data,BA_mev_th, Rch_th, FchFwk_th):
+    lkl = np.exp(-0.5*(exp_data[0]-BA_mev_th)**2/exp_data[1]**2)
     if (exp_data[2] != -1):
         lkl = lkl*np.exp(-0.5*(exp_data[2]-Rch_th)**2/exp_data[3]**2)
     if (FchFwk_th != -1):
@@ -123,10 +126,15 @@ bulks_0 = start_data[:,0]
 stds = start_data[:,1]
 bulks_p = np.empty_like(bulks_0)
 
+def compute_nuclei(i,params):
+    BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[i],Z[i],nstates_n[i],nstates_p[i],num_basis_states_f_list[i],num_basis_states_g_list[i],num_basis_states_c_list[i],num_basis_states_d_list[i],num_basis_meson_list[i],params,wrapper_functions_list[i],f_basis_list[i],g_basis_list[i],c_basis_list[i],d_basis_list[i],S_basis_list[i],V_basis_list[i],B_basis_list[i],A_basis_list[i],state_info_n_list[i],state_info_p_list[i],r_vecs[i],jac=jacobian_wrappers_list[i])
+    #print(A[i],BA_mev_th,Rch_th,Fch_Fwk_th)
+    return compute_lkl(exp_data[i,:],BA_mev_th,Rch_th,Fch_Fwk_th)
+
 #####################################################
 # MCMC metrpolis hastings
 #####################################################
-nburnin = 20
+nburnin = 50
 nruns = 0
 n_params = 8
 mw = 782.5
@@ -134,19 +142,18 @@ mp = 763.0
 n_nuclei = 10
 
 # initialize the starting point
-lkl0 = 1.0
-params = trans.get_parameters(bulks_0[0],bulks_0[1],bulks_0[2],bulks_0[3],bulks_0[4],bulks_0[5],bulks_0[6],bulks_0[7],mw,mp)
-for i in range(n_nuclei):
-    BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[i],Z[i],nstates_n[i],nstates_p[i],num_basis_states_f_list[i],num_basis_states_g_list[i],num_basis_states_c_list[i],num_basis_states_d_list[i],num_basis_meson_list[i],params,wrapper_functions_list[i],f_basis_list[i],g_basis_list[i],c_basis_list[i],d_basis_list[i],S_basis_list[i],V_basis_list[i],B_basis_list[i],A_basis_list[i],state_info_n_list[i],state_info_p_list[i],r_vecs[i],jac=None)
-    lkl0 = compute_lkl(exp_data[i,:],BA_mev_th,Rch_th,Fch_Fwk_th,lkl0)
-print(lkl0)
+params, flag = trans.get_parameters(bulks_0[0],bulks_0[1],bulks_0[2],bulks_0[3],bulks_0[4],bulks_0[5],bulks_0[6],bulks_0[7],mw,mp)
+ordered_inputs = [(9, params), (8, params), (7, params), (6, params), (5, params), (4, params), (3, params), (2, params), (1, params), (0, params)]
+with multiprocessing.Pool(processes=8) as pool:
+    results = pool.starmap(compute_nuclei, ordered_inputs)
+lkl0 = functools.reduce(operator.mul, results)
+print("parallel result:",lkl0)
 
 # burn in phase for MCMC
 acc_counts = [0]*n_params
 n_check = 50
 agoal = 0.5
 arate = [0]*n_params
-
 start_time = time.time()
 with open("burnin_out.txt", "w") as output_file:
     for i in range(nburnin):
@@ -156,16 +163,18 @@ with open("burnin_out.txt", "w") as output_file:
             for k in range(n_params):
                 bulks_p[k] = bulks_0[k] # copy old values
             bulks_p[j] = np.random.normal(bulks_0[j],stds[j])      # change one param
-            params = trans.get_parameters(bulks_p[0],bulks_p[1],bulks_p[2],bulks_p[3],bulks_p[4],bulks_p[5],bulks_p[6],bulks_p[7],mw,mp)
-        
-            # compute new liklihood
-            lklp = 1.0
-            ##########################
-            for k in range(10):
-                BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[k],Z[k],nstates_n[k],nstates_p[k],num_basis_states_f_list[k],num_basis_states_g_list[k],num_basis_states_c_list[k],num_basis_states_d_list[k],num_basis_meson_list[k],params,wrapper_functions_list[k],f_basis_list[k],g_basis_list[k],c_basis_list[k],d_basis_list[k],S_basis_list[k],V_basis_list[k],B_basis_list[k],A_basis_list[k],state_info_n_list[k],state_info_p_list[k],r_vecs[k],jac=jacobian_wrappers_list[k])
-                lklp = compute_lkl(exp_data[k,:],BA_mev_th,Rch_th,Fch_Fwk_th,lklp)
-            print(lklp)
-            ###########################
+            params, flag = trans.get_parameters(bulks_p[0],bulks_p[1],bulks_p[2],bulks_p[3],bulks_p[4],bulks_p[5],bulks_p[6],bulks_p[7],mw,mp)
+            if (flag == True):
+                lklp = 0
+            else:
+                # compute new liklihood
+                ##########################
+                ordered_inputs = [(9, params), (8, params), (7, params), (6, params), (5, params), (4, params), (3, params), (2, params), (1, params), (0, params)]
+                with multiprocessing.Pool(processes=8) as pool:
+                    results = pool.starmap(compute_nuclei, ordered_inputs)
+                lklp = functools.reduce(operator.mul, results)
+                print("lkl:",lklp)
+                ###########################
             # metroplis hastings step
             r = np.random.uniform(0,1)
             a = lklp/lkl0
@@ -185,14 +194,15 @@ with open("burnin_out.txt", "w") as output_file:
                 acc_counts[j] = 0
                 if (arate[j] < agoal):
                     stds[j] = 0.9*stds[j]      # if acceptance rate is too low then decrease the range
-                elif (arate > agoal):
+                elif (arate[j] > agoal):
                     stds[j] = 1.1*stds[j]      # if acceptance rate is too high then increase the range
         print(f"{i+1} completed")
 end_time = time.time()
+print("Burn in took:{:.4f} seconds".format((end_time-start_time)/50))
 ##############################################
 # end of burn in
 
-'''
+
 # start MCMC runs
 with open("MCMC.txt", "w") as output_file:
     for i in range(nruns):
@@ -202,24 +212,20 @@ with open("MCMC.txt", "w") as output_file:
             for k in range(n_params):
                 bulks_p[k] = bulks_0[k] # copy old values
             bulks_p[j] = np.random.normal(bulks_0[j],stds[j])      # change one param
-            params = trans.get_parameters(bulks_p[0],bulks_p[1],bulks_p[2],bulks_p[3],bulks_p[4],bulks_p[5],bulks_p[6],bulks_p[7],mw,mp)
-        
-            # compute new liklihood
-            lklp = 1.0
-            ##########################
-            for k in range(6):
-                BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[k],Z[k],nstates_n[k],nstates_p[k],num_basis_states_f_list[k],num_basis_states_g_list[k],num_basis_states_c_list[k],num_basis_states_d_list[k],num_basis_meson_list[k],params,wrapper_functions_list[k],f_basis_list[k],g_basis_list[k],c_basis_list[k],d_basis_list[k],S_basis_list[k],V_basis_list[k],B_basis_list[k],A_basis_list[k],state_info_n_list[k],state_info_p_list[k],r_vecs[k],jac=jacobian_wrappers_list[k])
-                lklp = compute_lkl(exp_data[k,:],BA_mev_th,Rch_th,Fch_Fwk_th,lklp)
-            BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[6],Z[6],nstates_n[6],nstates_p[6],num_basis_states_f_list[6],num_basis_states_g_list[6],num_basis_states_c_list[6],num_basis_states_d_list[6],num_basis_meson_list[6],params,wrapper_functions_list[6],f_basis_list[6],g_basis_list[6],c_basis_list[6],d_basis_list[6],S_basis_list[6],V_basis_list[6],B_basis_list[6],A_basis_list[6],state_info_n_list[6],state_info_p_list[6],r_vecs[6],jac=None)
-            lklp = compute_lkl(exp_data[6,:],BA_mev_th,Rch_th,Fch_Fwk_th,lklp)
-            BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[7],Z[7],nstates_n[7],nstates_p[7],num_basis_states_f_list[7],num_basis_states_g_list[7],num_basis_states_c_list[7],num_basis_states_d_list[7],num_basis_meson_list[7],params,wrapper_functions_list[7],f_basis_list[7],g_basis_list[7],c_basis_list[7],d_basis_list[7],S_basis_list[7],V_basis_list[7],B_basis_list[7],A_basis_list[7],state_info_n_list[7],state_info_p_list[7],r_vecs[7],jac=jacobian_wrappers_list[7])
-            lklp = compute_lkl(exp_data[7,:],BA_mev_th,Rch_th,Fch_Fwk_th,lklp)
-            BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[8],Z[8],nstates_n[8],nstates_p[8],num_basis_states_f_list[8],num_basis_states_g_list[8],num_basis_states_c_list[8],num_basis_states_d_list[8],num_basis_meson_list[8],params,wrapper_functions_list[8],f_basis_list[8],g_basis_list[8],c_basis_list[8],d_basis_list[8],S_basis_list[8],V_basis_list[8],B_basis_list[8],A_basis_list[8],state_info_n_list[8],state_info_p_list[8],r_vecs[8],jac=None)
-            lklp = compute_lkl(exp_data[8,:],BA_mev_th,Rch_th,Fch_Fwk_th,lklp)
-            BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[9],Z[9],nstates_n[9],nstates_p[9],num_basis_states_f_list[9],num_basis_states_g_list[9],num_basis_states_c_list[9],num_basis_states_d_list[9],num_basis_meson_list[9],params,wrapper_functions_list[9],f_basis_list[9],g_basis_list[9],c_basis_list[9],d_basis_list[9],S_basis_list[9],V_basis_list[9],B_basis_list[9],A_basis_list[9],state_info_n_list[9],state_info_p_list[9],r_vecs[9],jac=jacobian_wrappers_list[9])
-            lklp = compute_lkl(exp_data[9,:],BA_mev_th,Rch_th,Fch_Fwk_th,lklp)
-            print(lklp)
-            ###########################
+            params, flag = trans.get_parameters(bulks_p[0],bulks_p[1],bulks_p[2],bulks_p[3],bulks_p[4],bulks_p[5],bulks_p[6],bulks_p[7],mw,mp)
+            if (flag == True):
+                lklp = 0
+            else:
+                # compute new liklihood
+                ##########################
+                pool = multiprocessing.Pool(processes=8)
+                ordered_inputs = [(9, params), (8, params), (7, params), (6, params), (5, params), (4, params), (3, params), (2, params), (1, params), (0, params)]
+                results = pool.starmap(compute_nuclei, ordered_inputs)
+                pool.close()
+                pool.join()
+                lklp = functools.reduce(operator.mul, results)
+                print(lklp)
+                ###########################
             # metroplis hastings step
             r = np.random.uniform(0,1)
             a = lklp/lkl0
@@ -232,6 +238,4 @@ with open("MCMC.txt", "w") as output_file:
                     print(f"{bulks_0[k]}",file=output_file, end='  ')
                 print("",file=output_file)
 
-        print(f"{i+1} completed")     
-'''   
-print("Took:{:.4f} seconds per step".format((end_time - start_time)/nburnin))
+        print(f"{i+1} completed")

@@ -95,4 +95,9 @@ def get_parameters(BA, p0, mstar, K, J, L, zeta, ms, mw, mp):
     fin_couplings[6] = zeta
     fin_couplings[7] = lambda_v
 
-    return fin_couplings
+    if (gsoms2<0 or gwomw2<0 or gpomp2<0 or lambda_v<0 or zeta<0):
+        flag = True
+    else:
+        flag = False
+
+    return fin_couplings, flag
