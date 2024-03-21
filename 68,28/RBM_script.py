@@ -7,7 +7,7 @@ from scipy.integrate import simps
 import os
 import pprint
 import sys
-sys.path.append('/home/msals97/Desktop/FSU_FINITE/ReducedBasisMethods')
+sys.path.append('/home/msals97/Desktop/RBM/RBM')
 import functions as func
 
 current_directory = os.getcwd()
@@ -497,7 +497,7 @@ print("Equation coefficent and parameter replacement took {:.4f} seconds".format
 
 # Compute the Jacobian
 #####################################################################
-
+'''
 all_expressions = wf_equations + meson_equations + en_equations
 jacobian_matrix = sp.Matrix([[sp.diff(expr, symbol) for symbol in all_symbols] for expr in all_expressions])
 
@@ -509,7 +509,7 @@ final_jac = func.replace_params_with_vector_jac(new_jac,param_list)
 str_jac = [[str(expr) for expr in row] for row in final_jac]
 func.c_exponent_jac(str_jac)
 c_jac = np.array(str_jac).flatten()
-
+'''
 
 end_time_section10 = time.time()
 print("Jacobain took {:.4f} seconds".format(end_time_section10 - end_time_section9))
@@ -595,13 +595,95 @@ with open(f"{A},{Z}/equations.txt", 'a') as file:
     for j in range(nstates_n+nstates_p):
         file.write(f"    y[{n_wf_equations + num_basis_states_s + num_basis_states_v + num_basis_states_b + num_basis_states_a + j}] = {final_en_expr[j]}; \n")
 
-with open(f"{A},{Z}/jacobian.txt", 'w') as file:
-    for i in range(len(c_jac)):
-        file.write(f"    jac[{i}] = {c_jac[i]}; \n")
+#with open(f"{A},{Z}/jacobian.txt", 'w') as file:
+    #for i in range(len(c_jac)):
+        #file.write(f"    jac[{i}] = {c_jac[i]}; \n")
+
+# Get BA Equations
+V4_basis = func.basis_multiply(func.basis_multiply(func.basis_multiply(V_basis,V_basis),V_basis),V_basis)
+V4_coeff = func.coeff_multiply(func.coeff_multiply(func.coeff_multiply(coeff_set_v,coeff_set_v),coeff_set_v),coeff_set_v)
+S4_basis = func.basis_multiply(func.basis_multiply(func.basis_multiply(S_basis,S_basis),S_basis),S_basis)
+S4_coeff = func.coeff_multiply(func.coeff_multiply(func.coeff_multiply(coeff_set_s,coeff_set_s),coeff_set_s),coeff_set_s)
+V2_coeff = func.coeff_multiply(coeff_set_v,coeff_set_v)
+B2_coeff = func.coeff_multiply(coeff_set_b,coeff_set_b)
+V2B2_coeff = func.coeff_multiply(V2_coeff,B2_coeff)
+V2B2_basis = func.basis_multiply(V2_basis,B2_basis)
+
+en_neutrons = 0
+en_protons = 0
+for i in range(nstates_n):
+    en_neutrons = en_neutrons + state_info_n[i,2]*(2.0*state_info_n[i,0]+1.0)*en_set_n[i]
+for i in range(nstates_p):
+    en_protons = en_protons + state_info_p[i,2]*(2.0*state_info_p[i,0]+1.0)*en_set_p[i]
+
+meson_free = 0
+for i in range(num_basis_states_s):
+    S_sdensn = func.scalardens_BA(S_basis[:,i],f_basis,g_basis,coeff_set_f,coeff_set_g,nstates_n,state_info_n,r_vec)
+    S_sdensp = func.scalardens_BA(S_basis[:,i],c_basis,d_basis,coeff_set_c,coeff_set_d,nstates_p,state_info_p,r_vec)
+    meson_free = meson_free + coeff_set_s[i]*(S_sdensn+S_sdensp)
+for i in range(num_basis_states_v):
+    V_vdensn = func.vectordens_BA(V_basis[:,i],f_basis,g_basis,coeff_set_f,coeff_set_g,nstates_n,state_info_n,r_vec)
+    V_vdensp = func.vectordens_BA(V_basis[:,i],c_basis,d_basis,coeff_set_c,coeff_set_d,nstates_p,state_info_p,r_vec)
+    meson_free = meson_free - coeff_set_v[i]*(V_vdensn+V_vdensp)
+for i in range(num_basis_states_b):
+    B_vdensn = func.vectordens_BA(B_basis[:,i],f_basis,g_basis,coeff_set_f,coeff_set_g,nstates_n,state_info_n,r_vec)
+    B_vdensp = func.vectordens_BA(B_basis[:,i],c_basis,d_basis,coeff_set_c,coeff_set_d,nstates_p,state_info_p,r_vec)
+    meson_free = meson_free - coeff_set_b[i]*0.5*(B_vdensp-B_vdensn)
+for i in range(num_basis_states_a):
+    A_vdensp = func.vectordens_BA(A_basis[:,i],c_basis,d_basis,coeff_set_c,coeff_set_d,nstates_p,state_info_p,r_vec)
+    meson_free = meson_free - coeff_set_a[i]*A_vdensp
+
+meson_interact = - 1.0/6.0*kappa/enscale_mev*func.nonlinear_BA(S3_coeff,S3_basis,r_vec)*conv_r0_en**3 -1.0/12.0*lambda0*func.nonlinear_BA(S4_coeff,S4_basis,r_vec)*conv_r0_en**3 \
+                + 1.0/12.0*zeta*func.nonlinear_BA(V4_coeff,V4_basis,r_vec)*conv_r0_en**3 + 2.0*lambdav*func.nonlinear_BA(V2B2_coeff,V2B2_basis,r_vec)*conv_r0_en**3
+
+meson_free = meson_free*2.0*math.pi
+meson_interact = meson_interact*2.0*math.pi
+#BA_unitless = en_neutrons + en_protons + 2.0*math.pi*meson_integrand
+
+x = [sp.symbols(f'x[{i}]') for i in range(len(all_symbols))]
+sub_dict = {all_symbols[i]: x[i] for i in range(len(all_symbols))}
+meson_free = meson_free.subs(sub_dict)
+meson_interact = meson_interact.subs(sub_dict)
+en_BA = en_neutrons + en_protons
+en_BA = en_BA.subs(sub_dict)
+
+meson_free_str = [str(meson_free)]
+func.c_exponent_func(meson_free_str)
+meson_free_c = np.array(meson_free_str)
+
+x = [sp.symbols(f'params[{i}]') for i in range(len(param_list))]
+sub_dict = {param_list[i]: x[i] for i in range(len(param_list))}
+meson_interact = meson_interact.subs(sub_dict)
+
+meson_interact_str = [str(meson_interact)]
+func.c_exponent_func(meson_interact_str)
+meson_interact_c = np.array(meson_interact_str)
+
+en_BA_str = [str(en_BA)]
+func.c_exponent_func(en_BA_str)
+en_BA_c = np.array(en_BA_str)
+
+with open(f"{A},{Z}/BA.txt", 'w') as file:
+    file.write(f"    meson_free = {meson_free_c[0]};\n")
+    file.write(f"    meson_interact = {meson_interact_c[0]};\n")
+    file.write(f"    en_BA = {en_BA_c[0]};\n")
+    file.write(f"    BA = en_BA + meson_free + meson_interact;\n")
+
+x = [sp.symbols(f'x[{i}]') for i in range(len(all_symbols))]
+sub_dict = {all_symbols[i]: x[i] for i in range(len(all_symbols))}
+
+# get Rch
+Rp2 = func.get_Rp2(Z,c_basis,d_basis,coeff_set_c,coeff_set_d,nstates_p,state_info_p,r_vec)
+Rp2 = Rp2.subs(sub_dict)
+
+Rp2_str = [str(Rp2)]
+func.c_exponent_func(Rp2_str)
+Rp2_c = np.array(Rp2_str)
+
+with open(f"{A},{Z}/BA.txt", 'a') as file:
+    file.write(f"    Rp2 = {Rp2_c[0]};\n")
+    file.write(f"    Rch = sqrt(Rp2 + pow(0.84,2.0));\n")
 
 end_time_section11 = time.time()
 print("Printing took {:.4f} seconds".format(end_time_section11 - end_time_section10))
 ################################################################################
-
-
-

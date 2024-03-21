@@ -6,7 +6,6 @@ from scipy.integrate import simps
 from scipy.optimize import root
 import sys
 sys.path.append('/home/msals97/Desktop/RBM/RBM')
-from cyth_funcs import compute_fields, compute_meson_fields, get_densities
 
 # Define functions to be used in this script 
 ################################################################
@@ -126,6 +125,11 @@ def meson_project(single_basis_state, basis_proj, coeff_set_meson, meson_array, 
     result = remap_coeff_to_integrals(num_res,coeff_set_meson)
     return result
 
+def nonlinear_BA(coeff_set_meson, meson_array, r_vec):
+    num_res = simps(meson_array*r_vec[:,np.newaxis]**2,x=r_vec,axis=0)
+    result = remap_coeff_to_integrals(num_res,coeff_set_meson)
+    return result
+
 # used for doing things like f(r)/r
 def divide_array_wf(list_of_arrays, common_array):
     result_list = [array / common_array[:,np.newaxis] for array in list_of_arrays]
@@ -150,6 +154,38 @@ def scalardens_proj(basis_proj, basis_f, basis_g, coeff_f, coeff_g, nstates,stat
         proj_f = state_info[i][2]*(2.0*state_info[i][0]+1)/(4.0*math.pi)*simps(proj_array_f[i],x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(f^2/r^2 * y_i)
         proj_g = state_info[i][2]*(2.0*state_info[i][0]+1)/(4.0*math.pi)*simps(proj_array_g[i],x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(g^2/r^2 * y_i)
         res = res + remap_coeff_to_integrals(proj_f,coeff_list_f[i]) - remap_coeff_to_integrals(proj_g,coeff_list_g[i]) # subtract or add for scalar/vec
+    return res
+
+# get the scalar density times the meson field to compute BA
+def scalardens_BA(meson_basis, basis_f, basis_g, coeff_f, coeff_g, nstates,state_info,r_vec):
+    res = 0
+    coeff_list_f = [coeff_multiply(coeff_f[i],coeff_f[i]) for i in range(nstates)]
+    coeff_list_g = [coeff_multiply(coeff_g[i],coeff_g[i]) for i in range(nstates)]
+    f2r2 = [basis_multiply(basis_f[i],basis_f[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #f^2/r^2
+    g2r2 = [basis_multiply(basis_g[i],basis_g[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #g^2/r^2
+    meson_dens_array_f = multiply_array_wf(f2r2,meson_basis) #phi_i*f^2/r^2
+    meson_dens_array_g = multiply_array_wf(g2r2,meson_basis) #phi_i*g^2/r^2
+
+    for i in range(nstates):
+        proj_f = state_info[i][2]*(2.0*state_info[i][0]+1)/(4.0*math.pi)*simps(meson_dens_array_f[i]*r_vec[:, np.newaxis]**2,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(f^2/r^2 * y_i)
+        proj_g = state_info[i][2]*(2.0*state_info[i][0]+1)/(4.0*math.pi)*simps(meson_dens_array_g[i]*r_vec[:, np.newaxis]**2,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(g^2/r^2 * y_i)
+        res = res + remap_coeff_to_integrals(proj_f,coeff_list_f[i]) - remap_coeff_to_integrals(proj_g,coeff_list_g[i]) # subtract or add for scalar/vec
+    return res
+
+# get the scalar density times the meson field to compute BA
+def vectordens_BA(meson_basis, basis_f, basis_g, coeff_f, coeff_g, nstates,state_info,r_vec):
+    res = 0
+    coeff_list_f = [coeff_multiply(coeff_f[i],coeff_f[i]) for i in range(nstates)]
+    coeff_list_g = [coeff_multiply(coeff_g[i],coeff_g[i]) for i in range(nstates)]
+    f2r2 = [basis_multiply(basis_f[i],basis_f[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #f^2/r^2
+    g2r2 = [basis_multiply(basis_g[i],basis_g[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #g^2/r^2
+    meson_dens_array_f = multiply_array_wf(f2r2,meson_basis) #phi_i*f^2/r^2
+    meson_dens_array_g = multiply_array_wf(g2r2,meson_basis) #phi_i*g^2/r^2
+
+    for i in range(nstates):
+        proj_f = state_info[i][2]*(2.0*state_info[i][0]+1)/(4.0*math.pi)*simps(meson_dens_array_f[i]*r_vec[:, np.newaxis]**2,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(f^2/r^2 * y_i)
+        proj_g = state_info[i][2]*(2.0*state_info[i][0]+1)/(4.0*math.pi)*simps(meson_dens_array_g[i]*r_vec[:, np.newaxis]**2,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(g^2/r^2 * y_i)
+        res = res + remap_coeff_to_integrals(proj_f,coeff_list_f[i]) + remap_coeff_to_integrals(proj_g,coeff_list_g[i]) # subtract or add for scalar/vec
     return res
 
 # get the vector density and perform a galerkin projection onto a specified basis state
@@ -277,6 +313,33 @@ def Fv_Ft(q, vdens, tdens, rvec, r0_fm):
     Ftens = 4.0*math.pi*simps(tdens*(np.sin(q*rvec)/q**2 - np.cos(q*rvec)*rvec/q),x=rvec)
     return Fvec, Ftens
 
+# get the scalar density times the meson field to compute BA
+def Fv(basis_f, basis_g, coeff_f, coeff_g, nstates,state_info,r_vec,q):
+    res = 0
+    q = q*1.25
+    coeff_list_f = [coeff_multiply(coeff_f[i],coeff_f[i]) for i in range(nstates)]
+    coeff_list_g = [coeff_multiply(coeff_g[i],coeff_g[i]) for i in range(nstates)]
+    f2r2 = [basis_multiply(basis_f[i],basis_f[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #f^2/r^2
+    g2r2 = [basis_multiply(basis_g[i],basis_g[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #g^2/r^2
+
+    for i in range(nstates):
+        f2 = state_info[i][2]*(2.0*state_info[i][0]+1)*simps(f2r2[i]*np.sin(q*r_vec[:,np.newaxis])*r_vec[:,np.newaxis]/q,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(f^2/r^2 * y_i)
+        g2 = state_info[i][2]*(2.0*state_info[i][0]+1)*simps(g2r2[i]*np.sin(q*r_vec[:,np.newaxis])*r_vec[:,np.newaxis]/q,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(g^2/r^2 * y_i)
+        res = res + remap_coeff_to_integrals(f2,coeff_list_f[i]) + remap_coeff_to_integrals(g2,coeff_list_g[i]) # subtract or add for scalar/vec
+    return res
+
+# get the scalar density times the meson field to compute BA
+def Ft(basis_f, basis_g, coeff_f, coeff_g, nstates,state_info,r_vec,q):
+    res = 0
+    q = q*1.25
+    coeff_list_fg = [coeff_multiply(coeff_f[i],coeff_g[i]) for i in range(nstates)]
+    fgr2 = [basis_multiply(basis_f[i],basis_g[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #f^2/r^2
+
+    for i in range(nstates):
+        fg = 2.0*state_info[i][2]*(2.0*state_info[i][0]+1)*simps(fgr2[i]*(np.sin(q*r_vec[:,np.newaxis])/q**2 - np.cos(q*r_vec[:,np.newaxis])*r_vec[:,np.newaxis]/q),x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(f^2/r^2 * y_i)
+        res = res + remap_coeff_to_integrals(fg,coeff_list_fg[i])
+    return res
+
 def EM_Sachs_FF_pn(q):
     hbar_gevfm = .19732698
     q2 = (q*hbar_gevfm)**2
@@ -341,7 +404,7 @@ def FchFwk(q,vdensn,vdensp,tdensn,tdensp,rvec,A,Z):
     Qwk = Z*qwp + (A-Z)*qwn
 
     GEp, GEn, GMp, GMn = EM_Sachs_FF_pn(q)
-    WGEp, WGEn, WGMp, WGMn = WKEM_Sachs_FF_pn(GEp,GEn,GMp,GMn,20)
+    WGEp, WGEn, WGMp, WGMn = WKEM_Sachs_FF_pn(GEp,GEn,GMp,GMn,Z)
     Fvec_p, Ftens_p = Fv_Ft(q,vdensp,tdensp,rvec,r0_fm)
     Fvec_n, Ftens_n = Fv_Ft(q,vdensn,tdensn,rvec,r0_fm)
 
@@ -391,7 +454,6 @@ def get_BA(nstates_n, nstates_p,state_info_n,state_info_p,solution,s_field_appro
     meson_integrand = s_field_approx*(sdensn+sdensp) - v_field_approx*(vdensn+vdensp) - 0.5*b_field_approx*(vdensp-vdensn) - 1/6*params[4]/enscale_mev*s_field_approx**3*conv_r0_en**3 -1/12*params[5]*s_field_approx**4*conv_r0_en**3 \
                     + 1/12*params[6]*v_field_approx**4*conv_r0_en**3 + 2.0*params[7]*v_field_approx**2*b_field_approx**2*conv_r0_en**3 
     coulomb_integrand = -a_field_approx*vdensp
-
     integral = simps((meson_integrand+coulomb_integrand)*r_vec**2,x=r_vec)
     BA_unitless = en_neutrons + en_protons + 2*math.pi*integral
     #print(en_neutrons*enscale_mev/A, en_protons*enscale_mev/A, 2*math.pi*integral*enscale_mev/A)
@@ -407,6 +469,37 @@ def get_radii(A,Z,r_vec,vdensn,vdensp):
     Rp = math.sqrt(Rp2)
     Rch = math.sqrt(Rp2 + rp**2)
     return Rn, Rp, Rch
+
+def get_Rp2(Z, basis_f, basis_g, coeff_f, coeff_g, nstates,state_info,r_vec):
+    rp = 0.84
+    Rp2 = 0
+    coeff_list_f = [coeff_multiply(coeff_f[i],coeff_f[i]) for i in range(nstates)]
+    coeff_list_g = [coeff_multiply(coeff_g[i],coeff_g[i]) for i in range(nstates)]
+    f2r2 = [basis_multiply(basis_f[i],basis_f[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #f^2/r^2
+    g2r2 = [basis_multiply(basis_g[i],basis_g[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #g^2/r^2
+
+    for i in range(nstates):
+        proj_f = state_info[i][2]*(2.0*state_info[i][0]+1)*simps(f2r2[i]*r_vec[:, np.newaxis]**4,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(f^2/r^2 * y_i)
+        proj_g = state_info[i][2]*(2.0*state_info[i][0]+1)*simps(g2r2[i]*r_vec[:, np.newaxis]**4,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(g^2/r^2 * y_i)
+        Rp2 = Rp2 + remap_coeff_to_integrals(proj_f,coeff_list_f[i]) + remap_coeff_to_integrals(proj_g,coeff_list_g[i]) # subtract or add for scalar/vec
+    Rp2 = Rp2/Z*1.25**2
+    return Rp2
+
+# get the scalar density times the meson field to compute BA
+def vectordens_BA(meson_basis, basis_f, basis_g, coeff_f, coeff_g, nstates,state_info,r_vec):
+    res = 0
+    coeff_list_f = [coeff_multiply(coeff_f[i],coeff_f[i]) for i in range(nstates)]
+    coeff_list_g = [coeff_multiply(coeff_g[i],coeff_g[i]) for i in range(nstates)]
+    f2r2 = [basis_multiply(basis_f[i],basis_f[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #f^2/r^2
+    g2r2 = [basis_multiply(basis_g[i],basis_g[i])/r_vec[:, np.newaxis]**2 for i in range(nstates)] #g^2/r^2
+    meson_dens_array_f = multiply_array_wf(f2r2,meson_basis) #phi_i*f^2/r^2
+    meson_dens_array_g = multiply_array_wf(g2r2,meson_basis) #phi_i*g^2/r^2
+
+    for i in range(nstates):
+        proj_f = state_info[i][2]*(2.0*state_info[i][0]+1)/(4.0*math.pi)*simps(meson_dens_array_f[i]*r_vec[:, np.newaxis]**2,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(f^2/r^2 * y_i)
+        proj_g = state_info[i][2]*(2.0*state_info[i][0]+1)/(4.0*math.pi)*simps(meson_dens_array_g[i]*r_vec[:, np.newaxis]**2,x=r_vec,axis=0) # sum over states and integrate (2j+1)/(4*pi)*int(g^2/r^2 * y_i)
+        res = res + remap_coeff_to_integrals(proj_f,coeff_list_f[i]) + remap_coeff_to_integrals(proj_g,coeff_list_g[i]) # subtract or add for scalar/vec
+    return res
 
 def import_basis_numbers(A,Z):
     dir = f"{A},{Z}/{A},{Z},Data"
@@ -499,54 +592,14 @@ def get_basis(A, Z, nstates_n, nstates_p):
     d_basis = np.array([d_basis[i]*np.mean(d_fields[0][0,:])/d_basis[0][0,0] for i in range(nstates_p)])
     return f_basis, g_basis, c_basis, d_basis, S_basis, V_basis, B_basis, A_basis
     
-def hartree_RBM(A,Z,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson,params,c_function_wrapper,f_basis,g_basis,c_basis,d_basis,S_basis,V_basis,B_basis,A_basis,state_info_n,state_info_p,r_vec,jac=None):
+def hartree_RBM(A,Z,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson,params,c_function_wrapper,BA_function_wrapper,Rch_function_wrapper,Wkskin_wrapper,jac=None):
     initial_guess_array = initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3])
 
     params_array = np.array(params, dtype=np.double)
     solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=jac, method='hybr',options={'col_deriv': 1, 'xtol': 1e-8})
 
-    # Reconstruct the wave functions
-    f_coeff = np.array(pad([[solution.x[int(np.sum(num_basis_states_f[:j])) + i] for i in range(num_basis_states_f[j])] for j in range(nstates_n)]))
-    g_coeff = np.array(pad([[solution.x[sum(num_basis_states_f) + int(np.sum(num_basis_states_g[:j])) + i] for i in range(num_basis_states_g[j])] for j in range(nstates_n)]))
-    c_coeff = np.array(pad([[solution.x[sum(num_basis_states_f) + sum(num_basis_states_g) + int(np.sum(num_basis_states_c[:j])) + i] for i in range(num_basis_states_c[j])] for j in range(nstates_p)]))
-    d_coeff = np.array(pad([[solution.x[sum(num_basis_states_f) + sum(num_basis_states_g) + sum(num_basis_states_c) + int(np.sum(num_basis_states_d[:j])) + i] for i in range(num_basis_states_d[j])] for j in range(nstates_p)]))
-    f_fields_approx, g_fields_approx, c_fields_approx, d_fields_approx = compute_fields(f_coeff, g_coeff, c_coeff, d_coeff, nstates_n, nstates_p, f_basis, g_basis, c_basis, d_basis)
-
-    # Reconstruct the meson fields
-    total_wf_basis = sum(num_basis_states_f) + sum(num_basis_states_g) + sum(num_basis_states_c) + sum(num_basis_states_d)
-    s_coeff = np.array([solution.x[total_wf_basis + j] for j in range(num_basis_meson[0])])
-    v_coeff = np.array([solution.x[total_wf_basis + num_basis_meson[0] + j] for j in range(num_basis_meson[1])])
-    b_coeff = np.array([solution.x[total_wf_basis + num_basis_meson[0] + num_basis_meson[1] + j] for j in range(num_basis_meson[2])])
-    a_coeff = np.array([solution.x[total_wf_basis + num_basis_meson[0] + num_basis_meson[1] + num_basis_meson[2] + j] for j in range(num_basis_meson[3])])
-
-    s_field_approx, v_field_approx, b_field_approx, a_field_approx = compute_meson_fields(s_coeff, v_coeff, b_coeff, a_coeff, S_basis, V_basis, B_basis, A_basis)
-
-    # Compute densities
-    sdensn, vdensn, tdensn, sdensp, vdensp, tdensp = get_densities(r_vec, f_fields_approx, g_fields_approx, c_fields_approx, d_fields_approx, state_info_n, state_info_p)
-
-    # Compute binding energy
-    BA_mev = get_BA(nstates_n,nstates_p,state_info_n,state_info_p,solution,s_field_approx,v_field_approx,b_field_approx,a_field_approx,sdensn,sdensp,vdensn,vdensp,params,r_vec,A)
-    #print("Binding energy:", BA_mev)
-
-    # Compute Radii
-    Rn, Rp, Rch = get_radii(A,Z,r_vec,vdensn,vdensp)
-    RnRp = Rn - Rp
-    #print(f"Rn = {Rn}" )
-    #print(f"Rp = {Rp}" )
-    #print(f"Rn-Rp = {RnRp}" )
-    #print(f"Rch = {Rch}" )
-
-    # Compute Fch-Fwk
-    Fch_Fwk = 0
-    if (A==48):
-        Fch_Fwk = FchFwk(0.8733,vdensn,vdensp,tdensn,tdensp,r_vec,A,Z)
-        #print(f"Fch-Fwk = {FchFwk}")
-    elif (A==208):
-        Fch_Fwk = FchFwk(0.3977,vdensn,vdensp,tdensn,tdensp,r_vec,A,Z)
-        #print(f"Fch-Fwk = {FchFwk}")
-    else:
-        Fch_Fwk = -1
-
-
-    return BA_mev, Rch, Fch_Fwk
+    BA_mev = (BA_function_wrapper(solution.x,params)*13.269584506383948 - 0.75*41.0*A**(-1.0/3.0))/A - 939
+    Rcharge = Rch_function_wrapper(solution.x)
+    FchFwk = Wkskin_wrapper(solution.x)
+    return BA_mev, Rcharge, FchFwk
 
