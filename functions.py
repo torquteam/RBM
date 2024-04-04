@@ -569,27 +569,32 @@ def get_basis(A, Z, nstates_n, nstates_p):
     d_files = [file_pattern.format(p_labels[i]) for i in range(nstates_p)]
     d_fields = [load_data(d_file) for d_file in d_files]
 
+    # Import basis numbers
     num_basis_states_f, num_basis_states_g, num_basis_states_c, num_basis_states_d, num_basis_meson = import_basis_numbers(A,Z)
-    
-    S_basis = perform_pod(sigma_fields, num_basis_meson[0])
-    V_basis = perform_pod(omega_fields, num_basis_meson[1])
-    B_basis = perform_pod(rho_fields, num_basis_meson[2])
-    A_basis = perform_pod(coulomb_fields, num_basis_meson[3])
+    num_basis_states_s = num_basis_meson[0]
+    num_basis_states_v = num_basis_meson[1]
+    num_basis_states_b = num_basis_meson[2]
+    num_basis_states_a = num_basis_meson[3]
+
+    S_basis = perform_pod(sigma_fields, num_basis_states_s)
+    V_basis = perform_pod(omega_fields, num_basis_states_v)
+    B_basis = perform_pod(rho_fields, num_basis_states_b)
+    A_basis = perform_pod(coulomb_fields, num_basis_states_a)
     f_basis = [perform_pod(f_fields[i], np.max(num_basis_states_f)) for i in range(nstates_n)]
     g_basis = [perform_pod(g_fields[i], np.max(num_basis_states_g)) for i in range(nstates_n)]
     c_basis = [perform_pod(c_fields[i], np.max(num_basis_states_c)) for i in range(nstates_p)]
     d_basis = [perform_pod(d_fields[i], np.max(num_basis_states_d)) for i in range(nstates_p)]
 
     # rescale the basis states in accordance to the mean value of the sampled fields
-    S_basis = S_basis*np.mean(sigma_fields[0,:])/S_basis[0,0]
-    V_basis = V_basis*np.mean(omega_fields[0,:])/V_basis[0,0]
-    B_basis = B_basis*np.mean(rho_fields[0,:])/B_basis[0,0]
-    A_basis = A_basis*np.mean(coulomb_fields[0,:])/A_basis[0,0]
+    S_basis = S_basis[1:,:]*np.mean(sigma_fields[10,:])/S_basis[10,0]
+    V_basis = V_basis[1:,:]*np.mean(omega_fields[10,:])/V_basis[10,0]
+    B_basis = B_basis[1:,:]*np.mean(rho_fields[10,:])/B_basis[10,0]
+    A_basis = A_basis[1:,:]*np.mean(coulomb_fields[10,:])/A_basis[10,0]
 
-    f_basis = np.array([f_basis[i]*np.mean(f_fields[0][0,:])/f_basis[0][0,0] for i in range(nstates_n)])
-    g_basis = np.array([g_basis[i]*np.mean(g_fields[0][0,:])/g_basis[0][0,0] for i in range(nstates_n)])
-    c_basis = np.array([c_basis[i]*np.mean(c_fields[0][0,:])/c_basis[0][0,0] for i in range(nstates_p)])
-    d_basis = np.array([d_basis[i]*np.mean(d_fields[0][0,:])/d_basis[0][0,0] for i in range(nstates_p)])
+    f_basis = np.array([f_basis[i][1:,:]*np.mean(f_fields[i][10,:])/f_basis[i][10,0] for i in range(nstates_n)])
+    g_basis = np.array([g_basis[i][1:,:]*np.mean(g_fields[i][10,:])/g_basis[i][10,0] for i in range(nstates_n)])
+    c_basis = np.array([c_basis[i][1:,:]*np.mean(c_fields[i][10,:])/c_basis[i][10,0] for i in range(nstates_p)])
+    d_basis = np.array([d_basis[i][1:,:]*np.mean(d_fields[i][10,:])/d_basis[i][10,0] for i in range(nstates_p)])
     return f_basis, g_basis, c_basis, d_basis, S_basis, V_basis, B_basis, A_basis
     
 def hartree_RBM(A,Z,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson,params,c_function_wrapper,BA_function_wrapper,Rch_function_wrapper,Wkskin_wrapper,jac=None):

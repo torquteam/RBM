@@ -3,6 +3,7 @@ python setup.py build_ext --inplace
 
 # to compile c files
 gcc -shared -o c_functions.so -fPIC c_functions.c -O3
+gcc -shared -o c_functions_greedy.so -fPIC c_functions_greedy.c -O3
 
 error quantification and speed check (BA (mev), Rch (fm), Fch-Fwk)
 16,8 errors: 0.005591133270094026 BA   0.00024253602835381472 Rch
@@ -81,3 +82,16 @@ double Wkskin(double*x) {
     
     return FchFwk;
 }
+
+-18.3954  1  2  1.5  -2  1  2d3;2
+-18.3414  0  5  5.5  6  1  1h11;2
+
+from greedy
+4  3  3  2  2  3  2  2  3  5  2  2  3  3  2  3  2  3  2  3  4  3
+4  3  3  2  2  3  2  2  3  5  2  2  3  3  2  3  2  3  2  3  4  3
+4  3  4  2  4  4  2  2  3  5  2  2  3  2  5  3
+4  3  4  2  4  4  2  2  3  5  2  2  3  2  5  3
+7
+7
+7
+7
