@@ -8,7 +8,7 @@ import functions as func
 
 # Specify the nucleus
 ##################################################################
-nucleus = 3
+nucleus = 4
 ##################################################################
 
 # Specify the number of proton and neutron states
@@ -98,7 +98,7 @@ for i in range(nruns):
     BA_mev = (BA_function(solution.x,params_array)*13.269584506383948 - 0.75*41.0*A**(-1.0/3.0))/A - 939
     Rcharge = Rch(solution.x)
     #FchFwk = Wkskin(solution.x)
-    #print("Binding energy = ", BA_mev)
+    print("Binding energy = ", BA_mev)
     #print(f"Rch = {Rcharge}" )
 
     # compute the average err of each observable

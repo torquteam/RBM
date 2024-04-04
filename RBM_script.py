@@ -16,7 +16,7 @@ print("Current Working directory:", current_directory)
 # User Input
 ##################################################################
 #specify the nucleus
-nucleus = 9
+nucleus = 4
 
 # Jacobian computation
 jac = True
