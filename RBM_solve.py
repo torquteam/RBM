@@ -8,7 +8,7 @@ import functions as func
 
 # Specify the nucleus
 ##################################################################
-nucleus = 4
+nucleus = 9
 ##################################################################
 
 # Specify the number of proton and neutron states
