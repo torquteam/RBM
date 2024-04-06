@@ -8,7 +8,7 @@ import functions as func
 
 # Specify the nucleus
 ##################################################################
-nucleus = 9
+nucleus = 7
 ##################################################################
 
 # Specify the number of proton and neutron states
@@ -80,7 +80,10 @@ actual_results = func.load_data(dir + f"/{A},{Z}Observables_gar.txt")
 
 # Initial guess setup
 ##################################################
-initial_guess_array = func.initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3])
+energy_guess = 60.0
+en_n = [energy_guess]*nstates_n
+en_p = [energy_guess]*nstates_p
+initial_guess_array = func.initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],en_n,en_p)
 
 # Nonlinear solve
 ##############################################################################
@@ -91,7 +94,8 @@ errWk = 0
 nruns = 50
 for i in range(nruns):
     params = param_set[i%50,:]
-    #params = [ 4.98221529e+02,  1.23678125e+02,  2.13000274e+02,  1.00562765e+02, 3.04885299e+00, -5.76859283e-03,  1.81889037e-02,  1.32505843e-02]
+    params = [5.01269921e+02,  1.14640894e+02,  1.92614148e+02,  8.61596658e+02, 3.23254516e+00, -6.45196541e-03,  1.76276313e-02,  5.54065191e-02]
+
     params_array = np.array(params, dtype=np.double)
 
     solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=compute_jacobian_wrapper, method='hybr',options={'col_deriv': 1, 'xtol': 1e-8})
@@ -100,6 +104,7 @@ for i in range(nruns):
     #FchFwk = Wkskin(solution.x)
     print("Binding energy = ", BA_mev)
     #print(f"Rch = {Rcharge}" )
+    #print(solution.x)
 
     # compute the average err of each observable
     errBA = errBA + abs(actual_results[i%50][0] - BA_mev)

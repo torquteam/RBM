@@ -418,7 +418,7 @@ def FchFwk(q,vdensn,vdensp,tdensn,tdensp,rvec,A,Z):
 
     return Fch-Fwk
 
-def initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_states_s,num_basis_states_v,num_basis_states_b,num_basis_states_a):
+def initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_states_s,num_basis_states_v,num_basis_states_b,num_basis_states_a,n_energies,p_energies):
     initial_guesses = []
     for i in range(nstates_n):
         initial_guesses = initial_guesses + [1.0] + [0.0]*(num_basis_states_f[i]-1)
@@ -433,7 +433,7 @@ def initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_
         initial_guesses = initial_guesses + [1.0] + [0.0]*(num_basis_states_d[i]-1)
 
     initial_guesses = initial_guesses + [1.0] + [0.0]*(num_basis_states_s-1) + [1.0] + [0.0]*(num_basis_states_v-1) + [1.0] + [0.0]*(num_basis_states_b-1) + [1.0] + [0.0]*(num_basis_states_a-1)
-    initial_guesses = initial_guesses + [60.0]*nstates_n + [60.0]*nstates_p
+    initial_guesses = initial_guesses + n_energies + p_energies
 
     initial_guess_array = np.array(initial_guesses, dtype=np.double)
     return initial_guess_array
@@ -597,8 +597,8 @@ def get_basis(A, Z, nstates_n, nstates_p):
     d_basis = np.array([d_basis[i][1:,:]*np.mean(d_fields[i][10,:])/d_basis[i][10,0] for i in range(nstates_p)])
     return f_basis, g_basis, c_basis, d_basis, S_basis, V_basis, B_basis, A_basis
     
-def hartree_RBM(A,Z,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson,params,c_function_wrapper,BA_function_wrapper,Rch_function_wrapper,Wkskin_wrapper,jac=None):
-    initial_guess_array = initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3])
+def hartree_RBM(A,Z,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson,params,c_function_wrapper,BA_function_wrapper,Rch_function_wrapper,Wkskin_wrapper,n_energies,p_energies,jac=None):
+    initial_guess_array = initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],n_energies,p_energies)
 
     params_array = np.array(params, dtype=np.double)
     solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=jac, method='hybr',options={'col_deriv': 1, 'xtol': 1e-8})
@@ -606,5 +606,18 @@ def hartree_RBM(A,Z,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,nu
     BA_mev = (BA_function_wrapper(solution.x,params)*13.269584506383948 - 0.75*41.0*A**(-1.0/3.0))/A - 939
     Rcharge = Rch_function_wrapper(solution.x)
     FchFwk = Wkskin_wrapper(solution.x)
-    return BA_mev, Rcharge, FchFwk
+
+    en_n = [solution.x[i-nstates_n-nstates_p] for i in range(nstates_n)]
+    en_p = [solution.x[i-nstates_p] for i in range(nstates_p)]
+
+    if (abs(BA_mev) > 9.0 or abs(BA_mev) < 7.0):
+        initial_guess_array = initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],[60.0]*nstates_n,[60.0]*nstates_p)
+        solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=jac, method='hybr',options={'col_deriv': 1, 'xtol': 1e-8})
+        BA_mev = (BA_function_wrapper(solution.x,params)*13.269584506383948 - 0.75*41.0*A**(-1.0/3.0))/A - 939
+        Rcharge = Rch_function_wrapper(solution.x)
+        FchFwk = Wkskin_wrapper(solution.x)
+        en_n = n_energies
+        en_p = p_energies
+    
+    return BA_mev, Rcharge, FchFwk, en_n, en_p
 

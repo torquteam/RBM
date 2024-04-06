@@ -7,6 +7,7 @@ import multiprocessing
 import functools
 import operator
 import os
+from sys import exit
 
 current_directory = os.getcwd()
 print("Current Working directory:", current_directory)
@@ -114,6 +115,115 @@ for i in range(10):
     num_basis_states_d_list.append(num_basis_states_d)
     num_basis_meson_list.append(num_basis_meson)
 
+# define the lkl function for a single nucleus
+def compute_lkl(exp_data,BA_mev_th, Rch_th, FchFwk_th):
+    lkl = np.exp(-0.5*(exp_data[0]-BA_mev_th)**2/exp_data[1]**2)
+    if (exp_data[2] != -1):
+        lkl = lkl*np.exp(-0.5*(exp_data[2]-Rch_th)**2/exp_data[3]**2)
+    if (FchFwk_th != -1):
+        lkl = lkl*np.exp(-0.5*(exp_data[4]-FchFwk_th)**2/exp_data[5]**2)
+    return lkl
+
+# define the total liklihood
+def compute_nuclei_v2(num_nuclei,params,flag,n_energies_list,p_energies_list):
+    lkl = 1
+    if (flag == True):
+        print("flagged")
+        return 0.0
+    for i in range(num_nuclei):
+        BA_mev_th, Rch_th, Fch_Fwk_th, en_n, en_p = func.hartree_RBM(A[i],Z[i],nstates_n[i],nstates_p[i],num_basis_states_f_list[i],num_basis_states_g_list[i],num_basis_states_c_list[i],num_basis_states_d_list[i],num_basis_meson_list[i],params,wrapper_functions_list[i],BA_wrappers_list[i],Rch_wrappers_list[i],Wkskin_wrappers_list[i],n_energies_list[i],p_energies_list[i],jac=jacobian_wrappers_list[i])
+        n_energies_list[i] = en_n
+        p_energies_list[i] = en_p
+        #print(A[i],BA_mev_th)
+        lkl = lkl*compute_lkl(exp_data[i,:],BA_mev_th,Rch_th,Fch_Fwk_th)
+        if (abs(BA_mev_th) > 9.0 or abs(BA_mev_th) < 7.0):
+            print("error: ",params)
+            return 0.0
+
+    return lkl
+
+def metropolis(lkl0, lklp, bulks_0, bulks_p, acc_counts, output_file, index):
+    # metroplis hastings step
+    r = np.random.uniform(0,1)
+    a = lklp/lkl0
+    if (a>1):
+        a=1.0
+    if (r <= a):
+        lkl0 = lklp
+        for k in range(n_params):
+            bulks_0[k] = bulks_p[k] # accept the proposed changes
+        acc_counts[index]+=1   # count how many times the changes are accepted
+
+def adaptive_width(n_check,arate,acc_counts,stds,agoal,index):
+    if ((i+1)%n_check == 0):
+        arate[index] = acc_counts[index]/n_check
+        acc_counts[index] = 0
+        if (arate[index] < agoal):
+            stds[index] = 0.9*stds[index]      # if acceptance rate is too low then decrease the range
+        elif (arate[index] > agoal):
+            stds[index] = 1.1*stds[index]      # if acceptance rate is too high then increase the range
+
+def param_change(n_params, bulks_0, bulks_p, stds, mw, mp, index):
+    for k in range(n_params):
+        bulks_p[k] = bulks_0[k] # copy old values
+    bulks_p[index] = np.random.normal(bulks_0[index],stds[index])      # change one param
+    params, flag = trans.get_parameters(bulks_p[0],bulks_p[1],bulks_p[2],bulks_p[3],bulks_p[4],bulks_p[5],bulks_p[6],bulks_p[7],mw,mp)
+    return params, flag
+
+def MCMC_worker(args):
+    iterations_burn, iterations_run, process_id = args
+    np.random.seed(process_id)
+    start_time = time.time()
+    with open(f"burnin_out_{process_id}.txt", "w") as output_file:
+        for i in range(iterations_burn):
+            # one sweep
+            for j in range(n_params):
+                # get new proposed parameters
+                params, flag = param_change(n_params,bulks_0,bulks_p,stds,mw,mp,j)
+
+                # get the lkl
+                lklp = compute_nuclei_v2(n_nuclei,params,flag,energy_guess_n_list,energy_guess_p_list)
+
+                # metroplis hastings step
+                metropolis(lkl0,lklp,bulks_0,bulks_p,acc_counts,output_file,j)
+
+                # rate monitoring to adjust the width of the sampling
+                adaptive_width(n_check,arate,acc_counts,stds,agoal,j)
+
+            # print MCMC sweep
+            for k in range(n_params):
+                print(f"{bulks_0[k]}",file=output_file, end='  ')
+            print("",file=output_file)
+            print(f"{i+1} completed")
+    end_time = time.time()
+    print("Burn in took:{:.4f} seconds".format((end_time-start_time)))
+    ##############################################
+    # end of burn in
+
+    # start MCMC runs
+    with open(f"MCMC_{process_id}.txt", "w") as output_file:
+        for i in range(iterations_run):
+            # one sweep
+            for j in range(n_params):
+                # get new proposed parameters
+                params, flag = param_change(n_params,bulks_0,bulks_p,stds,mw,mp,j)
+
+                # get lkl
+                lklp = compute_nuclei_v2(n_nuclei,params,flag,energy_guess_n_list,energy_guess_p_list)
+
+                # metroplis hastings step
+                metropolis(lkl0,lklp,bulks_0,bulks_p,acc_counts,output_file,j)
+            
+            # print MCMC sweep
+            for k in range(n_params):
+                print(f"{bulks_0[k]}",file=output_file, end='  ')
+            print("",file=output_file)
+            print(f"{i+1} completed")
+
+# import the experimental data and errors
+exp_data_full = func.load_data("exp_data.txt")
+exp_data = exp_data_full[:,2:]
+
 # import state information (j, alpha, fill_frac, filetag)
 state_info_n_list = []
 state_info_p_list = []
@@ -133,140 +243,37 @@ for i in range(10):
     energy_guess_n_list.append(energy_guess_n)
     energy_guess_p_list.append(energy_guess_p)
 
-print(energy_guess_n_list[1])
-def compute_lkl(exp_data,BA_mev_th, Rch_th, FchFwk_th):
-    lkl = np.exp(-0.5*(exp_data[0]-BA_mev_th)**2/exp_data[1]**2)
-    if (exp_data[2] != -1):
-        lkl = lkl*np.exp(-0.5*(exp_data[2]-Rch_th)**2/exp_data[3]**2)
-    if (FchFwk_th != -1):
-        lkl = lkl*np.exp(-0.5*(exp_data[4]-FchFwk_th)**2/exp_data[5]**2)
-    return lkl
-
-# import the experimental data and errors
-exp_data_full = func.load_data("exp_data.txt")
-exp_data = exp_data_full[:,2:]
-
-# import start file and normalize
+# import start file
 start_data = func.load_data("MCMC_startfile.txt")
 bulks_0 = start_data[:,0]
-#bulks_0 = [-16.267735180987582, 0.1487504197034128, 0.5796102233938005, 228.8288441185011, 34.321244156393746, 75.94673230448575, 0.038694010541058296, 488.2194935337496,782.5,763]
 stds = start_data[:,1]
 bulks_p = np.empty_like(bulks_0)
-
-def compute_nuclei(args):
-    i, params = args
-    BA_mev_th, Rch_th, Fch_Fwk_th = func.hartree_RBM(A[i],Z[i],nstates_n[i],nstates_p[i],num_basis_states_f_list[i],num_basis_states_g_list[i],num_basis_states_c_list[i],num_basis_states_d_list[i],num_basis_meson_list[i],params,wrapper_functions_list[i],BA_wrappers_list[i],Rch_wrappers_list[i],Wkskin_wrappers_list[i],jac=jacobian_wrappers_list[i])
-    print(A[i],BA_mev_th,Rch_th,Fch_Fwk_th)
-    return compute_lkl(exp_data[i,:],BA_mev_th,Rch_th,Fch_Fwk_th)
 
 #####################################################
 # MCMC metrpolis hastings
 #####################################################
-nburnin = 20000
-nruns = 0
+nburnin = 10000
+nruns = 50000
 n_params = 8
 mw = 782.5
 mp = 763.0
 n_nuclei = 10
 
+# adaptive specifications for MCMC
+acc_counts = [0]*n_params
+n_check = 50
+agoal = 0.3
+arate = [0]*n_params
+
 # initialize the starting point
 params, flag = trans.get_parameters(bulks_0[0],bulks_0[1],bulks_0[2],bulks_0[3],bulks_0[4],bulks_0[5],bulks_0[6],bulks_0[7],mw,mp)
 #params, flag = trans.get_parameters(-16.267735180987582, 0.1487504197034128, 0.5796102233938005, 228.8288441185011, 34.321244156393746, 75.94673230448575, 0.038694010541058296, 488.2194935337496,mw,mp)
+#params = np.array([4.93933385e+02, 1.17600464e+02, 2.07292704e+02, 1.71160548e+04, 2.69606892e+00, 1.81131594e-03, 2.97681837e-02, 4.39006417e-02])
+lkl0 = compute_nuclei_v2(n_nuclei,params,flag,energy_guess_n_list,energy_guess_p_list)
 
-ordered_inputs = ordered_inputs = [(9,params),(8,params),(7,params),(6,params),(5,params),(4,params),(3,params),(2,params),(1,params),(0, params)]
-with multiprocessing.Pool(processes=8) as pool:
-    results = pool.map(compute_nuclei, ordered_inputs)
-lkl0 = functools.reduce(operator.mul, results)
-print("parallel result:",lkl0)
+# parallelize the MCMC
+n_processes = 4
 
-# burn in phase for MCMC
-acc_counts = [0]*n_params
-n_check = 50
-agoal = 0.2
-arate = [0]*n_params
-start_time = time.time()
-with open("burnin_out.txt", "w") as output_file:
-    for i in range(nburnin):
-
-        # get new proposed parameters
-        for j in range(n_params):
-            for k in range(n_params):
-                bulks_p[k] = bulks_0[k] # copy old values
-            bulks_p[j] = np.random.normal(bulks_0[j],stds[j])      # change one param
-            params, flag = trans.get_parameters(bulks_p[0],bulks_p[1],bulks_p[2],bulks_p[3],bulks_p[4],bulks_p[5],bulks_p[6],bulks_p[7],mw,mp)
-            if (flag == True):
-                print("flagged")
-                lklp = 0
-            else:
-                # compute new liklihood
-                ##########################
-                ordered_inputs = [(9,params),(8,params),(7,params),(6,params),(5,params),(4,params),(3,params),(2,params),(1,params),(0, params)]
-
-                with multiprocessing.Pool(processes=8) as pool:
-                    results = pool.map(compute_nuclei, ordered_inputs)
-                lklp = functools.reduce(operator.mul, results)
-                if (lklp == 0):
-                    print(params)
-                print("lkl:",lklp)
-                ###########################
-            # metroplis hastings step
-            r = np.random.uniform(0,1)
-            a = lklp/lkl0
-            if (a>1):
-                a=1.0
-            if (r <= a):
-                lkl0 = lklp
-                for k in range(n_params):
-                    bulks_0[k] = bulks_p[k] # accept the proposed changes
-                    print(f"{bulks_0[k]}",file=output_file, end='  ')
-                print("",file=output_file)
-                acc_counts[j]+=1   # count how many times the changes are accepted
-
-            # rate monitoring to adjust the width of the sampling
-            if ((i+1)%n_check == 0):
-                arate[j] = acc_counts[j]/n_check
-                acc_counts[j] = 0
-                if (arate[j] < agoal):
-                    stds[j] = 0.9*stds[j]      # if acceptance rate is too low then decrease the range
-                elif (arate[j] > agoal):
-                    stds[j] = 1.1*stds[j]      # if acceptance rate is too high then increase the range
-        print(f"{i+1} completed")
-end_time = time.time()
-print("Burn in took:{:.4f} seconds".format((end_time-start_time)/nburnin))
-##############################################
-# end of burn in
-
-
-# start MCMC runs
-with open("MCMC.txt", "w") as output_file:
-    for i in range(nruns):
-
-        # get new proposed parameters
-        for j in range(n_params):
-            for k in range(n_params):
-                bulks_p[k] = bulks_0[k] # copy old values
-            bulks_p[j] = np.random.normal(bulks_0[j],stds[j])      # change one param
-            params, flag = trans.get_parameters(bulks_p[0],bulks_p[1],bulks_p[2],bulks_p[3],bulks_p[4],bulks_p[5],bulks_p[6],bulks_p[7],mw,mp)
-            if (flag == True):
-                lklp = 0
-            else:
-                # compute new liklihood
-                ##########################
-                with multiprocessing.Pool(processes=8) as pool:
-                    results = pool.map(compute_nuclei, ordered_inputs)
-                lklp = functools.reduce(operator.mul, results)
-                print(lklp)
-                ###########################
-            # metroplis hastings step
-            r = np.random.uniform(0,1)
-            a = lklp/lkl0
-            if (a>1):
-                a=1.0
-            if (r <= a):
-                lkl0 = lklp
-                for k in range(n_params):
-                    bulks_0[k] = bulks_p[k] # accept the proposed changes
-                    print(f"{bulks_0[k]}",file=output_file, end='  ')
-                print("",file=output_file)
-
-        print(f"{i+1} completed")
+inputs = [(nburnin, nruns, i) for i in range(n_processes)]
+with  multiprocessing.Pool(processes=n_processes) as pool:
+    results = pool.map(MCMC_worker, inputs)

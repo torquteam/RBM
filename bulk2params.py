@@ -18,22 +18,22 @@ def common_integral(k, mstar):
     return integral
 
 def get_gpomp2(kf, J, L, gss, gww, gsoms2, gwomw2, kappa, lambda0, zeta, lambda_s=0.0, gdomd2=0.0):
-    mNuc = 939
+    mNuc = 939.0
     p0 = 2.0/(3.0*math.pi**2)*kf**3
     mstar = mNuc - gss
     en = np.sqrt(kf**2 + mstar**2)
     integral = common_integral(kf,mstar)
     alpha_s = 1.0 + gsoms2*(2.0/math.pi**2*integral + kappa*gss + 0.5*lambda0*gss**2)
-    dgssdp = gsoms2*(mstar/en)*alpha_s**-1
+    dgssdp = gsoms2*(mstar/en)*alpha_s**(-1.0)
     dmstardp = -dgssdp
     dendp = 1.0/en*(0.5*math.pi**2/kf + mstar*dmstardp)
-    dgdddt = -kf**3/(3.0*math.pi**2)*gdomd2*(mstar/en)*(1.0 + gdomd2*0.5/math.pi**2*integral + 2.0*lambda_s*gdomd2*gss**2)**-1.0
+    dgdddt = -kf**3/(3.0*math.pi**2)*gdomd2*(mstar/en)*(1.0 + gdomd2*0.5/math.pi**2*integral + 2.0*lambda_s*gdomd2*gss**2)**(-1.0)
     alpha_d = 1.0 + gdomd2*1.0/(2.0*math.pi**2)*integral + 2.0*lambda_s*gdomd2*gss**2
     dIdp = 0.5*(kf*math.pi)**2.0/en**3 - 3.0*dmstardp*mstar*(-1.0/3.0*(kf/en)**3.0 - kf/en + np.log(abs((kf+en)/mstar)))
-    dgdddpdt =  - 0.5*gdomd2*(mstar/en)*alpha_d**-1 - kf**3/(3.0*math.pi**2)*gdomd2*(dmstardp/en - mstar/en**2*dendp)*alpha_d**-1.0 + kf**3/(3.0*math.pi**2)*gdomd2**2*(mstar/en)*(1.0/(2.0*math.pi**2)*dIdp + 4.0*lambda_s*gss*dgssdp)*alpha_d**-2
+    dgdddpdt =  - 0.5*gdomd2*(mstar/en)*alpha_d**(-1) - kf**3/(3.0*math.pi**2)*gdomd2*(dmstardp/en - mstar/en**2*dendp)*alpha_d**-1.0 + kf**3/(3.0*math.pi**2)*gdomd2**2*(mstar/en)*(1.0/(2.0*math.pi**2)*dIdp + 4.0*lambda_s*gss*dgssdp)*alpha_d**-2
     phi = math.pi**2.0/(6.0*kf*en) - kf**2/(6.0*en**2)*dendp + 0.25/en*(dmstardp - mstar/en*dendp)*dgdddt + 0.25*mstar/en*dgdddpdt
     chi = 12.0*math.pi**2/kf**3*J - 2.0*math.pi**2/kf*1.0/en + (mstar/en)**2.0*gdomd2*alpha_d**-1
-    gpomp2 = 2.0*gwomw2*(1.0+0.5*zeta*gwomw2*gww**2)**-1.0*chi**2/(2.0*gwomw2*(1.0+0.5*zeta*gwomw2*gww**2)**-1.0*chi - (4.0*phi - 4.0*L/(3.0*p0) + 0.5*chi)*3.0*math.pi**2/kf**3*gww)
+    gpomp2 = 2.0*gwomw2*(1.0+0.5*zeta*gwomw2*gww**2)**(-1.0)*chi**2.0/(2.0*gwomw2*(1.0+0.5*zeta*gwomw2*gww**2)**(-1.0)*chi - (4.0*phi - 4.0*L/(3.0*p0) + 0.5*chi)*3.0*math.pi**2/kf**3.0*gww)
     return gpomp2
 
 def get_lambda_v(kf, J, gss, gww, gpomp2, lambda_s=0.0, gdomd2=0.0):
@@ -47,6 +47,11 @@ def get_lambda_v(kf, J, gss, gww, gpomp2, lambda_s=0.0, gdomd2=0.0):
     return lambda_v
 
 def get_parameters(BA, p0, mstar, K, J, L, zeta, ms, mw, mp):
+    if (L<J):
+        flag = True
+        fin_couplings = np.zeros(8)
+        return fin_couplings, flag
+    
     mNuc = 939
     mstar = mstar*mNuc
     p0 = p0*197.32698**3    # convert density from 1/fm3 to MeV^3
