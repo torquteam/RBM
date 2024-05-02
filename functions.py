@@ -15,6 +15,7 @@ def load_data(file_path):
     data = np.loadtxt(file_path)
     return data
 
+# loads the spectrum and returns list of orbital labels eg. (1s1/2) and a list of numerical values (n,j,l,alpha,fill frac)
 def load_spectrum(file_path):
     data = np.loadtxt(file_path, dtype=str)
     values = data[:, :-1].astype(float)  # Convert numeric part to float64
@@ -33,14 +34,16 @@ def perform_pod(data, n_basis):
     U_red = U[:, :n_basis]
     return U_red
 
-# takes derivative of something like a0*x0 + a1*x1 + ... with respect to r
+# input is a list of basis vectors [x0, x1, x2 ...]
+# used to take derivative of something like a0*x0 + a1*x1 + ... with respect to r (where x_i are vectors)
 def der(array, r_vec):
     result_array = np.zeros_like(array, dtype=float)
     for i in range(array.shape[1]):
         result_array[:, i] = np.gradient(array[:, i], r_vec, edge_order=2)
     return result_array
 
-# takes second derivative of something like a0*x0 + a1*x1 + ... with respect to r
+# input is a list of basis vectors [x0, x1, x2 ...]
+# used to take second derivative of something like a0*x0 + a1*x1 + ... with respect to r (where x_i are vectors)
 def der2(array, r_vec):
     result_array = np.zeros_like(array, dtype=float)
     for i in range(array.shape[1]):
@@ -49,11 +52,13 @@ def der2(array, r_vec):
         result_array[:, i] = second_derivative
     return result_array
 
-# generates coefficients for wave functions
+# generates coefficients for wave functions (function refers to f,g,c,d where {{f,g},{c,d}} are the upper and lower components of the neutron and proton wave functions respectively)
+# n is the number of basis coefficients and alpha is the quantum number
 def coeff_generate_wf(function, alpha, n):
     return [sp.symbols(f'coeff_a{i}_{function}_{alpha}') for i in range(0, n)]
 
-# generate coefficients for the meson fields
+# generate coefficients for the meson fields (field refers to s,v,b,a for meson and coulomb fields)
+# n is the number of basis coefficients 
 def coeff_generate_meson(field, n):
     return [sp.symbols(f'coeff_b{i}_{field}') for i in range(0, n)]
 
@@ -125,6 +130,7 @@ def meson_project(single_basis_state, basis_proj, coeff_set_meson, meson_array, 
     result = remap_coeff_to_integrals(num_res,coeff_set_meson)
     return result
 
+# Used to evaluate bidning energy integrals
 def nonlinear_BA(coeff_set_meson, meson_array, r_vec):
     num_res = simps(meson_array*r_vec[:,np.newaxis]**2,x=r_vec,axis=0)
     result = remap_coeff_to_integrals(num_res,coeff_set_meson)
@@ -172,7 +178,7 @@ def scalardens_BA(meson_basis, basis_f, basis_g, coeff_f, coeff_g, nstates,state
         res = res + remap_coeff_to_integrals(proj_f,coeff_list_f[i]) - remap_coeff_to_integrals(proj_g,coeff_list_g[i]) # subtract or add for scalar/vec
     return res
 
-# get the scalar density times the meson field to compute BA
+# get the vector density times the meson field to compute BA
 def vectordens_BA(meson_basis, basis_f, basis_g, coeff_f, coeff_g, nstates,state_info,r_vec):
     res = 0
     coeff_list_f = [coeff_multiply(coeff_f[i],coeff_f[i]) for i in range(nstates)]
@@ -220,6 +226,7 @@ def replace_params_with_vector(expressions_list, symbol_list):
     expressions_with_vector = [expr.subs({symbol_list[i]: x[i] for i in range(len(symbol_list))}) for expr in expressions_list]
     return expressions_with_vector
 
+# replace sympy symbols in jacobian
 def replace_coeff_with_vector_jac(expressions_matrix, symbol_list):
     x = [sp.symbols(f'x[{i}]') for i in range(len(symbol_list))]
 
@@ -230,6 +237,7 @@ def replace_coeff_with_vector_jac(expressions_matrix, symbol_list):
     ]
     return matrix_with_vector
 
+# replace sympy symbols for parameters in jacobian
 def replace_params_with_vector_jac(expressions_matrix, symbol_list):
     x = [sp.symbols(f'params[{i}]') for i in range(len(symbol_list))]
 
@@ -240,12 +248,14 @@ def replace_params_with_vector_jac(expressions_matrix, symbol_list):
     ]
     return matrix_with_vector
 
+# prints galerkin equations to file
 def print_equations_to_file(array, filename):
     with open(filename, 'a') as file:
         for i, value in enumerate(array):
             equation = f"    y[{i}] = {array[i]};\n"
             file.write(equation)
 
+# splits long expressions into 2. some long expressions cause recursion errors in python
 def split_expr(expression):
     # Extract operands and operators
     s_length = len(expression)
@@ -260,6 +270,7 @@ def split_expr(expression):
         else:
             char += 1
 
+# replace x**y exponentiation by the c standard pow(x,y) in the jacobian
 def c_exponent_jac(jacobian):
     for row in jacobian:
         for i in range(len(row)):
@@ -280,6 +291,7 @@ def c_exponent_jac(jacobian):
                 index = expr.find("**")
                 row[i] = expr
 
+# replace x**y exponentiation by the c standard pow(x,y) in the galerkin equations
 def c_exponent_func(arr):
     for i in range(len(arr)):
         expr = arr[i]
@@ -299,6 +311,7 @@ def c_exponent_func(arr):
             index = expr.find("**")
             arr[i] = expr
 
+# used for uneven length arrays such as {{0,1},{0,1,2},{0}} to make the consistently same size
 def pad(arr):
     # Find the maximum length among all inner arrays
     max_length = max(len(row) for row in arr)
@@ -307,6 +320,7 @@ def pad(arr):
     padded_arr = np.array([np.pad(row, (0, max_length - len(row)), mode='constant') for row in arr])
     return padded_arr
 
+# compute vector and tensor form factors at a given momentum transfer
 def Fv_Ft(q, vdens, tdens, rvec, r0_fm):
     q = q*r0_fm
     Fvec = 4.0*math.pi*simps(vdens*np.sin(q*rvec)*rvec/q,x=rvec)
@@ -597,9 +611,11 @@ def get_basis(A, Z, nstates_n, nstates_p):
     d_basis = np.array([d_basis[i][1:,:]*np.mean(d_fields[i][10,:])/d_basis[i][10,0] for i in range(nstates_p)])
     return f_basis, g_basis, c_basis, d_basis, S_basis, V_basis, B_basis, A_basis
     
-def hartree_RBM(A,Z,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson,params,c_function_wrapper,BA_function_wrapper,Rch_function_wrapper,Wkskin_wrapper,n_energies,p_energies,jac=None):
-    initial_guess_array = initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],n_energies,p_energies)
-
+def hartree_RBM(A,nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson,params,c_function_wrapper,BA_function_wrapper,Rch_function_wrapper,Wkskin_wrapper,n_energies,p_energies,jac=None):
+    if (A==100):
+        initial_guess_array = initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],[60.0]*nstates_n,[60.0]*nstates_p)
+    else:
+        initial_guess_array = initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],n_energies,p_energies)
     params_array = np.array(params, dtype=np.double)
     solution = root(c_function_wrapper, x0=initial_guess_array, args=(params_array,), jac=jac, method='hybr',options={'col_deriv': 1, 'xtol': 1e-8})
 

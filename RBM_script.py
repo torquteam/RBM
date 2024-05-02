@@ -16,7 +16,7 @@ print("Current Working directory:", current_directory)
 # User Input
 ##################################################################
 #specify the nucleus
-nucleus = 4
+nucleus = 7
 
 # Jacobian computation
 jac = True
@@ -33,7 +33,6 @@ A_list = [16,40,48,68,90,100,116,132,144,208]
 Z_list = [8, 20,20,28,40,50, 50, 50, 62, 82]
 A = A_list[nucleus]
 Z = Z_list[nucleus]
-
 
 mNuc_mev = 939.0
 mOmega = 782.5

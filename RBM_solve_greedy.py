@@ -8,7 +8,7 @@ import functions as func
 
 # Specify the nucleus
 ##################################################################
-nucleus = 0
+nucleus = 9
 ##################################################################
 
 # Specify the number of proton and neutron states
@@ -119,7 +119,7 @@ actual_results = func.load_data(dir + f"/{A},{Z}Observables_gar.txt")
 
 # Initial guess setup
 ##################################################
-initial_guess_array = func.initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3])
+initial_guess_array = func.initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],[50]*nstates_n,[60]*nstates_p)
 
 # Nonlinear solve
 ##############################################################################
@@ -231,7 +231,7 @@ while(finalerr>0.01):
             err_p = [0.0]*nstates_p
             errBA = 0.0
             num_basis_states_wf = np.array(num_basis_states_f+num_basis_states_g+num_basis_states_c+num_basis_states_d, dtype=np.int32)
-            initial_guess_array = func.initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3])
+            initial_guess_array = func.initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],[60]*nstates_n,[60]*nstates_p)
             for j in range(50):
                 params = param_set_gar[j,:]
                 params_array = np.array(params, dtype=np.double)
