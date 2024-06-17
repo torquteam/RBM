@@ -35,3 +35,5 @@ double Wkskin(double*x) {
 132,50  mid conditioned  [40,60]
 144,62  well conditioned [20,60]
 208,82  ill conditioned  [50,60]
+
+1098, 1142, 1181, 1606, 1607, 2150, 2332, 2333, 2508 index
