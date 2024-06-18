@@ -123,11 +123,30 @@ for i in range(10):
 
 # define the prior distribution
 def compute_prior(bulks):
-    prior_data = [-16.0, 0.15, 0.6, 230.0, 34.0, 80.0, 0.03, 500.0]
-    prior_unct = [1.0  , 0.04, 0.1, 10.0 , 4.0 , 40.0, 0.03, 50.0 ]
-    lkl= 1.0
-    for i in range(len(prior_data)):
-        lkl = lkl*np.exp(-0.5*(prior_data[i]-bulks[i])**2/prior_unct[i]**2)
+    means = [-16.26558444, 1.313376841, 0.5823967057, 245.2376583, 32.63451849, 36.40722853, 0.000572921399725]
+    invcov = [[ 1.35616867e+04, 8.55098841e+04, 3.91492276e+04, 3.90299502e+01, 5.07162665e+02, -3.06318450e+01, 1.39413882e+04],
+              [ 8.55098841e+04, 1.54157281e+06, 1.61781553e+05, 5.57240160e+02, 2.44139887e+03, -1.35280744e+02, 5.73105756e+05],
+              [ 3.91492276e+04, 1.61781553e+05, 1.99003786e+05, 9.90272479e+01, 1.76056535e+03, -1.20134116e+02, 1.24519976e+05],
+              [ 3.90299502e+01, 5.57240160e+02, 9.90272479e+01, 3.81419189e-01, 1.40263783e+00, -7.65850751e-02, 2.10865708e+02],
+              [ 5.07162665e+02, 2.44139887e+03, 1.76056535e+03, 1.40263783e+00, 3.42719235e+01, -2.25676157e+00, 1.00228434e+03],
+              [-3.06318450e+01, -1.35280744e+02, -1.20134116e+02, -7.65850751e-02, -2.25676157e+00, 1.95969722e-01, -1.57127916e+02],
+              [ 1.39413882e+04, 5.73105756e+05, 1.24519976e+05, 2.10865708e+02, 1.00228434e+03, -1.57127916e+02, 5.16325484e+06]]
+    
+    #prior_data = [-16.0, 0.15, 0.6, 230.0, 34.0, 80.0, 0.03, 500.0]
+    #prior_unct = [1.0  , 0.04, 0.1, 10.0 , 4.0 , 40.0, 0.03, 50.0 ]
+    #lkl= 1.0
+    vec = []
+    for i in range(len(means)):
+        vec.append(bulks[i] - means[i])
+    vec = np.array(vec)
+    vecT = np.transpose(vec)
+    chisq = np.matmul(vecT,invcov)
+    chisq = np.matmul(chisq,vec)
+
+
+    #for i in range(len(prior_data)):
+        #lkl = lkl*np.exp(-0.5*(prior_data[i]-bulks[i])**2/prior_unct[i]**2)
+    lkl = np.exp(-chisq/2.0)
     return lkl
 
 # define the lkl function for a single nucleus
@@ -315,7 +334,7 @@ agoal = 0.3
 arate = [0]*n_params
 
 # initialize the starting point
-'''
+
 params, flag = trans.get_parameters(bulks_0[0],bulks_0[1],bulks_0[2],bulks_0[3],bulks_0[4],bulks_0[5],bulks_0[6],bulks_0[7],mw,mp)
 #params, flag = trans.get_parameters(-16.20922384680473,  0.14874945980481055,  0.5637026253817242,  245.50998742105892,  32.68594158147973,  54.774894701933974,  0.028009904259910175,  497.52017153360873 ,mw,mp)
 #params = np.array([496.939, 110.349, 187.695, 192.927, 3.26, -0.003551, 0.0235, 0.043377]) #garnet 1.5447531287323243e-16
@@ -333,12 +352,12 @@ n_processes = 4
 inputs = [(nburnin, nruns, i, post0) for i in range(n_processes)]
 with  multiprocessing.Pool(processes=n_processes) as pool:
     results = pool.map(MCMC_worker, inputs)
-'''
+
 
 #######################################################
 # Posterior Observables
 #######################################################
-posterior_observables("MCMC_noskin.txt",energy_guess_n_list,energy_guess_p_list,n_params)
+#posterior_observables("MCMC_noskin.txt",energy_guess_n_list,energy_guess_p_list,n_params)
 
 def error_sample(posterior_file, n_samples, n_params):
     posterior = np.loadtxt(posterior_file)

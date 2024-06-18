@@ -171,6 +171,7 @@ def total_chisq(ms, n_energies_list, p_energies_list, params, printres):
             print("error: ",params)
     return res
 
+
 ms0 = [501.5] # initial guess for ms
 with open("MCMC28_finite.txt",'w') as output_file:
     for i in range(len(couplings)):
@@ -181,3 +182,18 @@ with open("MCMC28_finite.txt",'w') as output_file:
         for j in range(1,7):
             print(couplings[i,j],end= '  ',file=output_file)
         print(couplings[i,7],file=output_file)
+        res = total_chisq(result.x,energy_guess_n_list,energy_guess_p_list,params,True)
+        print(res)
+
+'''
+mean_params = [0.0004075061752, 0.000270793293, 0.0006472945187, 4.231869706, -0.01817572428, 0.000572921399725, 0.04265150996]
+params = np.append([500.0], mean_params)
+params[1] = params[1]*params[0]**2
+params[2] = params[2]*782.5**2
+params[3] = params[3]*763.0**2
+print(params)
+result = minimize(total_chisq,x0=[501.5],args=(energy_guess_n_list,energy_guess_p_list,params,False,),method='Powell')
+print(params)
+res = total_chisq(result.x,energy_guess_n_list,energy_guess_p_list,params,True)
+print(np.exp(-0.5*res))
+'''
