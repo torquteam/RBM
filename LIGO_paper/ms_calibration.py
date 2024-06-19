@@ -3,7 +3,8 @@ import ctypes
 from scipy.optimize import minimize
 import os
 import sys
-sys.path.append('/Users/marcsalinas/Desktop/GIT_REPOS/RBM')
+#sys.path.append('/Users/marcsalinas/Desktop/GIT_REPOS/RBM')
+sys.path.append('/Users/marcsalinas/Desktop/RBM')
 import functions as func
 
 current_directory = os.getcwd()
@@ -171,7 +172,7 @@ def total_chisq(ms, n_energies_list, p_energies_list, params, printres):
             print("error: ",params)
     return res
 
-
+'''
 ms0 = [501.5] # initial guess for ms
 with open("MCMC28_finite.txt",'w') as output_file:
     for i in range(len(couplings)):
@@ -184,8 +185,8 @@ with open("MCMC28_finite.txt",'w') as output_file:
         print(couplings[i,7],file=output_file)
         res = total_chisq(result.x,energy_guess_n_list,energy_guess_p_list,params,True)
         print(res)
-
 '''
+
 mean_params = [0.0004075061752, 0.000270793293, 0.0006472945187, 4.231869706, -0.01817572428, 0.000572921399725, 0.04265150996]
 params = np.append([500.0], mean_params)
 params[1] = params[1]*params[0]**2
@@ -196,4 +197,3 @@ result = minimize(total_chisq,x0=[501.5],args=(energy_guess_n_list,energy_guess_
 print(params)
 res = total_chisq(result.x,energy_guess_n_list,energy_guess_p_list,params,True)
 print(np.exp(-0.5*res))
-'''
