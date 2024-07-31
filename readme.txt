@@ -40,3 +40,36 @@ double Wkskin(double*x) {
 
 stds
 [1.24142543e-02 5.90060235e-04 4.07984506e-03 2.12421685e+00 4.65884299e-01 4.43354386e+00 1.39905195e-03 6.95795170e-01]
+
+# Speed up quantification
+
+error quantification (BA (mev), Rch (fm), Fch-Fwk)
+16,8 errors: 
+    5.73s/run   0.0034s/run     1685x speedup
+
+40,20 errors:
+    8.50s/run   0.0109s/run     779x speedup
+
+48,20 errors:
+    12.75s/run  0.0130s/run     980x speedup
+
+68,28 errors:
+    13.38s/run  0.0160s/run     836x speedup
+
+90,40 errors:
+    18.22s/run  0.0285s/run     639x speedup
+
+100,50 errors:
+    15.42s/run  0.0381s/run     404x speedup
+
+116,50 errors:
+    15.09s/run  0.0447s/run     342x speedup
+
+132,50 errors:
+    17.96s/run  0.0537s/run     334x speedup
+
+144,62 errors:
+    25.44s/run  0.0701s/run     363x speedup
+
+208,82 errors:
+    26.18s/run  0.237s/run      110x speedup

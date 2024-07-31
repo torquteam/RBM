@@ -80,7 +80,7 @@ actual_results = func.load_data(dir + f"/{A},{Z}Observables_gar.txt")
 
 # Initial guess setup
 ##################################################
-energy_guess = 60.1
+energy_guess = 60.0
 en_n = [energy_guess]*nstates_n
 en_p = [energy_guess]*nstates_p
 initial_guess_array = func.initial_guess(nstates_n,nstates_p,num_basis_states_f,num_basis_states_g,num_basis_states_c,num_basis_states_d,num_basis_meson[0],num_basis_meson[1],num_basis_meson[2],num_basis_meson[3],en_n,en_p)
@@ -91,10 +91,10 @@ start_time = time.time()
 errBA = 0
 errRch = 0
 errWk = 0
-nruns = 1
+nruns = 50
 for i in range(nruns):
     params = param_set[i%50,:]
-    params = [ 4.91535057e+02,  1.13540860e+02,  2.02292742e+02,  7.83608188e+01, 2.41408501e+00,  8.36385008e-03,  3.91298477e-02, -1.50364299e-03]
+    #params = [ 4.91535057e+02,  1.13540860e+02,  2.02292742e+02,  7.83608188e+01, 2.41408501e+00,  8.36385008e-03,  3.91298477e-02, -1.50364299e-03]
 
     params_array = np.array(params, dtype=np.double)
 
